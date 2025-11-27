@@ -11,6 +11,6 @@ package com.mycompany.sparkystore;
 public class SparkyStore {
 
     public static void main(String[] args) {
-        System.out.println("Sparky Store v1.1");
+        System.out.println("Sparky Store v1.2");
     }
 }
