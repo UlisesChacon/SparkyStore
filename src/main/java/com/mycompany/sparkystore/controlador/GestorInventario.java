@@ -4,94 +4,59 @@
  */
 package com.mycompany.sparkystore.controlador;
 
-/**
- *
- * @author USULISES
- */
 import com.mycompany.sparkystore.modelo.Producto;
 import java.io.*;
 import java.util.ArrayList;
-
-// Asumimos que tus clases modelo están en un paquete 'modelo'
-// import modelo.Producto; 
+import java.util.List;
+import java.util.stream.Collectors; // Necesario para filtrar listas
 
 public class GestorInventario {
 
-    // 1. La "Base de Datos" en memoria (Polimorfismo puro: guarda Laptops y Mouses)
     private ArrayList<Producto> listaProductos;
-    
-    // 2. La ruta del archivo binario
     private final String ARCHIVO = "inventario.dat";
 
-    // CONSTRUCTOR
     public GestorInventario() {
         this.listaProductos = new ArrayList<>();
-        cargarInventario(); // Al instanciar la clase, recuperamos los datos del archivo
+        cargarInventario();
     }
 
-    /**
-     * MÉTODO 1: GUARDAR (Serialización)
-     * Escribe la lista completa en el disco duro.
-     * Se debe llamar cada vez que agregamos o modificamos un producto.
-     */
+    // --- 1. PERSISTENCIA (Guardar y Cargar) ---
+    
     public void guardarInventario() {
         try (ObjectOutputStream oos = new ObjectOutputStream(new FileOutputStream(ARCHIVO))) {
             oos.writeObject(listaProductos);
-            System.out.println("--> Datos guardados correctamente en " + ARCHIVO);
+            // System.out.println("--> Datos guardados en disco."); // Opcional: para depurar
         } catch (IOException e) {
-            System.err.println("Error al guardar el inventario: " + e.getMessage());
+            System.err.println("Error crítico al guardar: " + e.getMessage());
         }
     }
 
-    /**
-     * MÉTODO 2: CARGAR (Deserialización)
-     * Lee el archivo binario y reconstruye los objetos en memoria.
-     */
     @SuppressWarnings("unchecked")
     private void cargarInventario() {
         try (ObjectInputStream ois = new ObjectInputStream(new FileInputStream(ARCHIVO))) {
             listaProductos = (ArrayList<Producto>) ois.readObject();
         } catch (FileNotFoundException e) {
-            // Es normal la primera vez, ya que el archivo no existe.
-            System.out.println("--> Archivo de inventario no encontrado. Se creará uno nuevo al guardar.");
+            System.out.println("--> Iniciando sistema nuevo (Archivo no existe aún).");
             listaProductos = new ArrayList<>();
         } catch (IOException | ClassNotFoundException e) {
             System.err.println("Error al cargar inventario: " + e.getMessage());
+            listaProductos = new ArrayList<>();
         }
     }
 
-    /**
-     * MÉTODO 3: AGREGAR PRODUCTO
-     * Añade al ArrayList y actualiza el archivo binario.
-     */
+    // --- 2. MÉTODOS CRUD (Crear, Leer, Eliminar) ---
+
     public void agregarProducto(Producto nuevoProducto) {
         listaProductos.add(nuevoProducto);
-        guardarInventario(); // Persistencia inmediata
+        guardarInventario(); // Guardado automático
     }
 
-    /**
-     * MÉTODO 4: LISTAR
-     * Muestra todos los productos usando el toString() de cada clase hija.
-     */
-    public void mostrarInventario() {
-        if (listaProductos.isEmpty()) {
-            System.out.println("El inventario está vacío.");
-            return;
-        }
-        
-        System.out.println("\n--- LISTA DE PRODUCTOS ---");
-        for (Producto p : listaProductos) {
-            System.out.println(p.toString()); // Polimorfismo en acción
-        }
+    public List<Producto> listarProductos() {
+        return listaProductos;
     }
 
-    /**
-     * MÉTODO 5: BUSCAR POR ID
-     * Útil para cuando el cliente selecciona un producto para comprar.
-     */
-    public Producto buscarProductoPorId(int id) {
+    public Producto buscarProducto(int id) {
         for (Producto p : listaProductos) {
-            // Asumimos que tu clase Producto tiene un método getId()
             if (p.getId() == id) {
                 return p;
             }
@@ -99,28 +64,37 @@ public class GestorInventario {
         return null; // No encontrado
     }
 
-    /**
-     * MÉTODO 6: VALIDAR Y DESCONTAR STOCK
-     * Regla de Negocio: Validar stock antes de agregar al carrito.
-     */
-    public boolean disminuirStock(int idProducto, int cantidadRequerida) {
-        Producto p = buscarProductoPorId(idProducto);
-        
+    public boolean eliminarProducto(int id) {
+        Producto p = buscarProducto(id);
         if (p != null) {
-            if (p.getStock() >= cantidadRequerida) {
-                p.setStock(p.getStock() - cantidadRequerida);
-                guardarInventario(); // Guardamos el nuevo stock en el archivo
-                return true;
-            } else {
-                System.out.println("Error: Stock insuficiente (Disponible: " + p.getStock() + ")");
-                return false;
-            }
+            listaProductos.remove(p);
+            guardarInventario(); // Actualizamos el archivo tras borrar
+            return true;
         }
         return false;
     }
-    
-    // Getter para obtener la lista si fuera necesario externamente
-    public ArrayList<Producto> getListaProductos() {
-        return listaProductos;
+
+    // --- 3. MÉTODOS DE NEGOCIO (Para el Menú y Ventas) ---
+
+    /**
+     * Filtra la lista completa y devuelve solo los de la categoría pedida.
+     * @param categoria Ej: "Computo", "Suministros", "Software"
+     */
+    public List<Producto> listarPorCategoria(String categoria) {
+        // Usamos Streams de Java 8+ para filtrar rápido
+        return listaProductos.stream()
+                .filter(p -> p.getCategoria().equalsIgnoreCase(categoria))
+                .collect(Collectors.toList());
+    }
+
+    /**
+     * Valida si hay suficiente stock sin restarlo todavía.
+     */
+    public boolean validarStock(int idProducto, int cantidadRequerida) {
+        Producto p = buscarProducto(idProducto);
+        if (p != null) {
+            return p.getStock() >= cantidadRequerida;
+        }
+        return false;
     }
 }
